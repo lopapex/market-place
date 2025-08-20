@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Čas & Období (4 min)</title>
+  <style>
+    :root{
+      /* Barvy (dle zadání) */
+      --spring: #ff8a00;  /* jaro – oranžová */
+      --summer: #7d3cff;  /* léto – fialová */
+      --autumn: #ffd60a;  /* podzim – žlutá */
+      --winter: #00c853;  /* zima – zelená */
+
+      --text-dark: #111111;
+      --text-light: #ffffff;
+    }
+
+    html, body { height: 100%; }
+    body{
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100svh; /* lepší pro mobilní prohlížeče */
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      background: #f0f0f0;
+      color: var(--text-dark);
+    }
+
+    .wrap{
+      width: 100%;
+      max-width: 520px; /* mobil-first, ale hezky i na širším displeji */
+      text-align: center;
+    }
+
+    .clock{ font-size: clamp(40px, 14vw, 84px); font-weight: 800; letter-spacing: 1px; line-height: 1.1; }
+    .season{ font-size: clamp(22px, 6vw, 36px); font-weight: 700; margin-top: 14px; text-transform: uppercase; letter-spacing: 1px; }
+    .countdown{ font-size: clamp(14px, 4vw, 18px); opacity: .95; margin-top: 6px; font-weight: 500; }
+
+    .card{
+      backdrop-filter: saturate(140%) blur(6px);
+      border-radius: 22px;
+      padding: 22px 20px 18px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.18);
+      color: inherit;
+      transition: background-color 320ms ease, color 320ms ease;
+    }
+
+    .card[data-season="jaro"]{ background: var(--spring); color: var(--text-dark); }
+    .card[data-season="leto"]{ background: var(--summer); color: var(--text-light); }
+    .card[data-season="podzim"]{ background: var(--autumn); color: var(--text-dark); }
+    .card[data-season="zima"]{ background: var(--winter); color: var(--text-light); }
+
+    .footer-note{ margin-top: 18px; font-size: 12px; opacity: .7; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section id="card" class="card" aria-live="polite">
+      <div id="time" class="clock" role="text" aria-label="Aktuální čas">--:--:--</div>
+      <div id="season" class="season">Jaro</div>
+      <div id="countdown" class="countdown">Změna za 4:00</div>
+    </section>
+  </main>
+
+  <script>
+    // === Nastavení ===
+    const CYCLE_MINUTES = 4; // ← dle zadání; stačí změnit jen toto číslo
+
+    const SEASONS = [
+      { key: 'jaro',   label: 'Jaro',   bg: 'jaro'   }, // oranžová
+      { key: 'leto',   label: 'Léto',   bg: 'leto'   }, // fialová
+      { key: 'podzim', label: 'Podzim', bg: 'podzim' }, // žlutá
+      { key: 'zima',   label: 'Zima',   bg: 'zima'   }, // zelená
+    ];
+
+    const elTime = document.getElementById('time');
+    const elSeason = document.getElementById('season');
+    const elCountdown = document.getElementById('countdown');
+    const elCard = document.getElementById('card');
+
+    function pad(n){ return String(n).padStart(2, '0'); }
+
+    function getSeasonIndex(now){
+      const totalSeconds = Math.floor(now.getTime()/1000);
+      const blockSeconds = CYCLE_MINUTES * 60;
+      const cycleSeconds = blockSeconds * SEASONS.length;
+      const pos = ((totalSeconds % cycleSeconds) + cycleSeconds) % cycleSeconds;
+      return Math.floor(pos / blockSeconds);
+    }
+
+    function getSecondsToNextChange(now){
+      const totalSeconds = Math.floor(now.getTime()/1000);
+      const blockSeconds = CYCLE_MINUTES * 60;
+      const intoBlock = totalSeconds % blockSeconds;
+      return (blockSeconds - intoBlock) % blockSeconds;
+    }
+
+    function update(){
+      const now = new Date();
+      elTime.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+      const idx = getSeasonIndex(now);
+      const season = SEASONS[idx];
+      elSeason.textContent = season.label;
+      elCard.setAttribute('data-season', season.bg);
+
+      const secs = getSecondsToNextChange(now);
+      const mm = Math.floor(secs / 60);
+      const ss = secs % 60;
+      elCountdown.textContent = `Změna za ${mm}:${pad(ss)}`;
+    }
+
+    update();
+    setInterval(update, 1000);
+  </script>
+</body>
+</html>
