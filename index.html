@@ -6,52 +6,35 @@
   <title>Čas & Období (5 min)</title>
   <style>
     :root{
-      /* Barvy (dle zadání) */
-      --spring: #ff8a00;  /* jaro – oranžová */
-      --summer: #7d3cff;  /* léto – fialová */
-      --autumn: #ffd60a;  /* podzim – žlutá */
-      --winter: #00c853;  /* zima – zelená */
-
+      --spring: #ff8a00;
+      --summer: #7d3cff;
+      --autumn: #ffd60a;
+      --winter: #00c853;
       --text-dark: #111111;
       --text-light: #ffffff;
     }
-
     html, body { height: 100%; }
     body{
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      display: flex; align-items: center; justify-content: center;
-      min-height: 100svh; /* lepší pro mobilní prohlížeče */
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100svh;
       padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
       background: #f0f0f0;
       color: var(--text-dark);
     }
-
-    .wrap{
-      width: 100%;
-      max-width: 520px; /* mobil-first, ale hezky i na širším displeji */
-      text-align: center;
-    }
-
+    .wrap{ width: 100%; max-width: 520px; text-align: center; }
     .clock{ font-size: clamp(40px, 14vw, 84px); font-weight: 800; letter-spacing: 1px; line-height: 1.1; }
     .season{ font-size: clamp(22px, 6vw, 36px); font-weight: 700; margin-top: 14px; text-transform: uppercase; letter-spacing: 1px; }
     .countdown{ font-size: clamp(14px, 4vw, 18px); opacity: .95; margin-top: 6px; font-weight: 500; }
-
-    .card{
-      backdrop-filter: saturate(140%) blur(6px);
-      border-radius: 22px;
-      padding: 22px 20px 18px;
-      box-shadow: 0 8px 30px rgba(0,0,0,.18);
-      color: inherit;
-      transition: background-color 320ms ease, color 320ms ease;
-    }
-
+    .card{ backdrop-filter: saturate(140%) blur(6px); border-radius: 22px; padding: 22px 20px 18px; box-shadow: 0 8px 30px rgba(0,0,0,.18); color: inherit; transition: background-color 320ms ease, color 320ms ease; }
     .card[data-season="jaro"]{ background: var(--spring); color: var(--text-dark); }
     .card[data-season="leto"]{ background: var(--summer); color: var(--text-light); }
     .card[data-season="podzim"]{ background: var(--autumn); color: var(--text-dark); }
     .card[data-season="zima"]{ background: var(--winter); color: var(--text-light); }
-
     .footer-note{ margin-top: 18px; font-size: 12px; opacity: .7; }
+    .wakelock-toggle, .music-toggle { margin-top: 20px; padding: 10px 18px; font-size: 14px; font-weight: 600; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.12); background: #333; color: #fff; transition: background 0.3s ease; }
+    .wakelock-toggle.active, .music-toggle.active { background: #00875a; }
   </style>
 </head>
 <body>
@@ -61,39 +44,47 @@
       <div id="season" class="season">Jaro</div>
       <div id="countdown" class="countdown">Změna za 4:00</div>
     </section>
+    <button id="wakelockBtn" class="wakelock-toggle">🔒 Zabránit zhasnutí</button>
+    <button id="musicBtn" class="music-toggle">🎵 Zapnout hudbu</button>
+    <div id="wakelockStatus" class="footer-note"></div>
   </main>
 
   <script>
-    // === Nastavení ===
-    const CYCLE_MINUTES = 5; // ← dle zadání; stačí změnit jen toto číslo
-
     const SEASONS = [
-      { key: 'jaro',   label: 'Jaro',   bg: 'jaro'   }, // oranžová
-      { key: 'leto',   label: 'Léto',   bg: 'leto'   }, // fialová
-      { key: 'podzim', label: 'Podzim', bg: 'podzim' }, // žlutá
-      { key: 'zima',   label: 'Zima',   bg: 'zima'   }, // zelená
+      { key: 'jaro',   label: 'Jaro',   bg: 'jaro',   music: 'jaro.mp3'   },
+      { key: 'leto',   label: 'Léto',   bg: 'leto',   music: 'leto.mp3'   },
+      { key: 'podzim', label: 'Podzim', bg: 'podzim', music: 'podzim.mp3' },
+      { key: 'zima',   label: 'Zima',   bg: 'zima',   music: 'zima.mp3'   },
     ];
 
     const elTime = document.getElementById('time');
     const elSeason = document.getElementById('season');
     const elCountdown = document.getElementById('countdown');
     const elCard = document.getElementById('card');
+    const btnWakeLock = document.getElementById('wakelockBtn');
+    const btnMusic = document.getElementById('musicBtn');
+    const elStatus = document.getElementById('wakelockStatus');
 
-    function pad(n){ return String(n).padStart(2, '0'); }
+    let wakeLock = null;
+    let currentSeasonIndex = null;
+    let currentAudio = null;
+    let musicEnabled = false;
+    let kirikiAudio = new Audio('kiriki.mp3');
+
+    function pad(n){ return String(n).padStart(2,'0'); }
 
     function getSeasonIndex(now){
-      const totalSeconds = Math.floor(now.getTime()/1000);
-      const blockSeconds = CYCLE_MINUTES * 60;
-      const cycleSeconds = blockSeconds * SEASONS.length;
-      const pos = ((totalSeconds % cycleSeconds) + cycleSeconds) % cycleSeconds;
-      return Math.floor(pos / blockSeconds);
+      const block = Math.floor(now.getMinutes()/5);
+      return block % SEASONS.length;
     }
 
     function getSecondsToNextChange(now){
-      const totalSeconds = Math.floor(now.getTime()/1000);
-      const blockSeconds = CYCLE_MINUTES * 60;
-      const intoBlock = totalSeconds % blockSeconds;
-      return (blockSeconds - intoBlock) % blockSeconds;
+      const minutes = now.getMinutes();
+      const seconds = now.getSeconds();
+      const nextBlockMinute = Math.floor(minutes/5)*5 + 5;
+      let deltaMinutes = nextBlockMinute - minutes;
+      if(deltaMinutes===0 && seconds===0) deltaMinutes = 5;
+      return deltaMinutes*60 - seconds;
     }
 
     function update(){
@@ -101,18 +92,79 @@
       elTime.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 
       const idx = getSeasonIndex(now);
+      if(idx !== currentSeasonIndex) changeSeason(idx);
+
+      const secs = getSecondsToNextChange(now);
+      const mm = Math.floor(secs/60);
+      const ss = secs % 60;
+      elCountdown.textContent = `Změna za ${mm}:${pad(ss)}`;
+
+      // Hudba – zastav 4:56 a kiriki 8 sekund před koncem
+      if(currentAudio){
+        if(secs <= 4 && secs > 0) { currentAudio.pause(); currentAudio.currentTime=0; }
+      }
+      if(secs <= 8 && secs > 0){
+        kirikiAudio.play().catch(()=>{});
+      }
+    }
+
+    function changeSeason(idx){
+      currentSeasonIndex = idx;
       const season = SEASONS[idx];
       elSeason.textContent = season.label;
       elCard.setAttribute('data-season', season.bg);
 
-      const secs = getSecondsToNextChange(now);
-      const mm = Math.floor(secs / 60);
-      const ss = secs % 60;
-      elCountdown.textContent = `Změna za ${mm}:${pad(ss)}`;
+      if(musicEnabled){
+        if(currentAudio) { currentAudio.pause(); currentAudio=null; }
+        currentAudio = new Audio(season.music);
+        currentAudio.loop = true;
+        currentAudio.play().catch(()=>{});
+      }
     }
 
     update();
-    setInterval(update, 1000);
+    setInterval(update,1000);
+
+    function setWakeLockButton(active){
+      if(active){ btnWakeLock.classList.add("active"); btnWakeLock.textContent="🔓 Povolit zhasnutí"; }
+      else{ btnWakeLock.classList.remove("active"); btnWakeLock.textContent="🔒 Zabránit zhasnutí"; }
+    }
+
+    async function requestWakeLock(){
+      try{
+        wakeLock = await navigator.wakeLock.request("screen");
+        elStatus.textContent="Displej zůstane zapnutý.";
+        setWakeLockButton(true);
+        wakeLock.addEventListener("release",()=>{ elStatus.textContent="Displej může zhasnout."; setWakeLockButton(false); });
+      }catch(err){ elStatus.textContent="Nepodařilo se zapnout: "+err.message; setWakeLockButton(false); }
+    }
+
+    async function toggleWakeLock(){
+      if(!('wakeLock' in navigator)){ elStatus.textContent="Wake Lock API není podporováno."; return; }
+      if(wakeLock){ await wakeLock.release(); wakeLock=null; setWakeLockButton(false); }
+      else await requestWakeLock();
+    }
+    btnWakeLock.addEventListener("click", toggleWakeLock);
+
+    function setMusicButton(active){
+      if(active){
+        btnMusic.classList.add("active");
+        btnMusic.textContent="🎵 Vypnout hudbu";
+        if(currentSeasonIndex!==null && !currentAudio){
+          currentAudio = new Audio(SEASONS[currentSeasonIndex].music);
+          currentAudio.loop=true;
+          currentAudio.play().catch(()=>{});
+        }
+      }else{
+        btnMusic.classList.remove("active");
+        btnMusic.textContent="🎵 Zapnout hudbu";
+        if(currentAudio){ currentAudio.pause(); currentAudio=null; }
+      }
+    }
+    btnMusic.addEventListener("click", ()=>{
+      musicEnabled=!musicEnabled;
+      setMusicButton(musicEnabled);
+    });
   </script>
 </body>
 </html>
